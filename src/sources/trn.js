@@ -6,8 +6,6 @@ export async function fetchFromTRN({ region, name, tag }) {
   if (!apiKey) throw new Error('trn: missing API key');
 
   const profile = `${encodeURIComponent(name)}%23${encodeURIComponent(tag)}`;
-
-  // Not: platform = riot; region query ile geçiyoruz (eu|na|ap|kr|latam|br)
   const url = `https://public-api.tracker.gg/v2/valorant/standard/profile/riot/${profile}?region=${encodeURIComponent(region)}`;
 
   try {
@@ -16,7 +14,6 @@ export async function fetchFromTRN({ region, name, tag }) {
       headers: {
         'TRN-Api-Key': apiKey,
         'Accept': 'application/json',
-        // Bazı ortamlarda UA gerekebiliyor:
         'User-Agent': 'valorant-rank-proxy/1.0'
       }
     });
