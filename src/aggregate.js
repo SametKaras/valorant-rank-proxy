@@ -1,19 +1,11 @@
 // src/aggregate.js
-import { fetchFromTRN } from './sources/trn.js';
-import { fetchFromHenrik } from './sources/henrik.js'; // mevcutsa
+import { fetchFromHenrik } from './sources/henrik.js';
 
 export async function aggregate({ region, name, tag }) {
-  // 1) TRN first
-  try {
-    const t = await fetchFromTRN({ region, name, tag });
-    if (t.rank != null || t.rr != null || t.elo != null) return t;
-  } catch (_) {}
+  // 1) Henrik (primary)
+  const a = await fetchFromHenrik({ region, name, tag });
+  if (a.rank != null || a.rr != null || a.elo != null) return a;
 
-  // 2) Henrik fallback (optional)
-  try {
-    const h = await fetchFromHenrik({ region, name, tag });
-    if (h.rank != null || h.rr != null || h.elo != null) return h;
-  } catch (_) {}
-
+  // (İstersen burada ileride başka fallback kaynaklar ekleriz)
   throw new Error('all-sources-failed');
 }
