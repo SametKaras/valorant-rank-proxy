@@ -11,8 +11,9 @@ export function parsePlayer(str) {
   return { name, tag };
 }
 
+// src/lib/utils.js
 export function normalizeRegion(r) {
   const x = (r || '').toLowerCase();
-  if (['eu', 'na', 'ap', 'kr', 'latam', 'br'].includes(x)) return x;
+  if (['eu','na','ap','kr','latam','br'].includes(x)) return x;
   return 'eu';
 }
