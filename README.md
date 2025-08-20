@@ -78,7 +78,7 @@ Set a cooldown (5–10s) to avoid spam. 👌
 4) Deploy, then test:
    - `/` → `OK`  
    - `/__debug` → `{"hasKey":true,...}`  
-   - `/rank?player=TenZ%23NA1&region=na`
+   - `/rank?player=russz%231982&region=na`
 
 > Uses an in-memory cache per instance. Ideal for chat usage and keeps Henrik API calls low.
 
@@ -100,7 +100,7 @@ Set a cooldown (5–10s) to avoid spam. 👌
    ```
 3) Endpoints:  
    - `http://localhost:3000/` → `OK`  
-   - `http://localhost:3000/rank?player=TenZ%23NA1&region=na`
+   - `http://localhost:3000/rank?player=russz%231982&region=eu`
 
 ---
 
