@@ -1,14 +1,19 @@
 // src/aggregate.js
-import { fetchFromHenrik } from './sources/henrik.js';
+import { fetchFromTRN } from './sources/trn.js';
+import { fetchFromHenrik } from './sources/henrik.js'; // mevcutsa
 
 export async function aggregate({ region, name, tag }) {
-  // 1) Henrik
+  // 1) TRN first
   try {
-    const a = await fetchFromHenrik({ region, name, tag });
-    if (a.rank || a.rr !== null) return a;
-  } catch (e) {
-    // proceed to next source in the future
-  }
+    const t = await fetchFromTRN({ region, name, tag });
+    if (t.rank != null || t.rr != null || t.elo != null) return t;
+  } catch (_) {}
+
+  // 2) Henrik fallback (optional)
+  try {
+    const h = await fetchFromHenrik({ region, name, tag });
+    if (h.rank != null || h.rr != null || h.elo != null) return h;
+  } catch (_) {}
 
   throw new Error('all-sources-failed');
 }
