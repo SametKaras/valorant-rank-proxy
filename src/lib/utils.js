@@ -13,7 +13,6 @@ export function parsePlayer(str) {
 
 export function normalizeRegion(r) {
   const x = (r || '').toLowerCase();
-  // TRN supports these region slugs; keep them if provided:
   if (['eu', 'na', 'ap', 'kr', 'latam', 'br'].includes(x)) return x;
   return 'eu';
 }
