@@ -1,34 +1,26 @@
 // src/sources/trn.js
 import axios from 'axios';
 
-/**
- * Tracker Network (TRN) VALORANT profile API
- * Docs: https://tracker.gg/developers  (after login)
- *
- * Endpoint (example):
- *   GET https://public-api.tracker.gg/v2/valorant/standard/profile/{region}/{name}%23{tag}
- *
- * Returns (normalized):
- *   { source: 'trn', rank, rr, elo }
- */
 export async function fetchFromTRN({ region, name, tag }) {
   const apiKey = process.env.TRN_API_KEY;
-  if (!apiKey) {
-    throw new Error('trn: missing API key');
-  }
+  if (!apiKey) throw new Error('trn: missing API key');
 
-  // %23 for '#'
   const profile = `${encodeURIComponent(name)}%23${encodeURIComponent(tag)}`;
-  // TRN region typically: eu | na | ap | kr | latam | br (we pass what we have)
-  const url = `https://public-api.tracker.gg/v2/valorant/standard/profile/${region}/${profile}`;
+
+  // Not: platform = riot; region query ile geçiyoruz (eu|na|ap|kr|latam|br)
+  const url = `https://public-api.tracker.gg/v2/valorant/standard/profile/riot/${profile}?region=${encodeURIComponent(region)}`;
 
   try {
     const { data } = await axios.get(url, {
       timeout: 8000,
-      headers: { 'TRN-Api-Key': apiKey }
+      headers: {
+        'TRN-Api-Key': apiKey,
+        'Accept': 'application/json',
+        // Bazı ortamlarda UA gerekebiliyor:
+        'User-Agent': 'valorant-rank-proxy/1.0'
+      }
     });
 
-    // Find a segment with overall rank/rr info
     const segments = data?.data?.segments || [];
     const overview =
       segments.find(s => s.type === 'overview') ||
@@ -37,7 +29,6 @@ export async function fetchFromTRN({ region, name, tag }) {
 
     const stats = overview?.stats || {};
 
-    // try several possible fields (TRN sometimes varies)
     const rank =
       stats.rankName?.value ??
       stats.competitiveRank?.metadata?.tierName ??
