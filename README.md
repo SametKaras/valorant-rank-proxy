@@ -19,9 +19,9 @@ GET https://vave-valorant.deno.dev/rank?player=<Name%23TAG>&region=<eu|na|ap|kr|
 Examples:
 
 - Healthcheck: `https://vave-valorant.deno.dev/` → `OK`
-- Rank: `https://vave-valorant.deno.dev/rank?player=TenZ%23NA1&region=na`
+- Rank: `https://vave-valorant.deno.dev/rank?player=russz%231982&region=na`
 
-> Note: `#` **must** be URL-encoded as `%23` (e.g., `TenZ%23NA1`).
+> Note: `#` **must** be URL-encoded as `%23` (e.g., `russz%231982`).
 
 ---
 
@@ -89,7 +89,7 @@ Caching is in-memory (per instance) and controlled by `CACHE_TTL_MS` (default 60
 4) Deploy, then test:
    - `/` → `OK`  
    - `/__debug` → `{"hasKey":true,...}`  
-   - `/rank?player=TenZ%23NA1&region=na`
+   - `/rank?player=russz%231982&region=na`
 
 > Uses an in-memory cache per instance. Ideal for chat usage and keeps upstream calls low.
 
