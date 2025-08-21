@@ -2,24 +2,26 @@
 
 A tiny HTTP service that returns a VALORANT player’s **Rank / RR / Elo** as a single line of text.  
 Perfect for chat bots (e.g. StreamElements on Kick) and easy hosting on **Deno Deploy** (free).  
-Data source: **HenrikDev** community API (requires an API key via their Discord).
+**Primary data source:** HenrikDev (API key via their Discord).  
+**Fallback:** KyrosKoh public API (used automatically if Henrik is unavailable).
 
 ---
 
 ## Live Usage (hosted)
 
-If you’re using a deployed instance, call:
+If you’re using this deployed instance, call:
 
 ```
 GET https://vave-valorant.deno.dev/rank?player=<Name%23TAG>&region=<eu|na|ap|kr|latam|br>
 ```
 
+
 Examples:
 
 - Healthcheck: `https://vave-valorant.deno.dev/` → `OK`
-- Rank: `https://vave-valorant.deno.dev/rank?player=russz%231982&region=eu`
+- Rank: `https://vave-valorant.deno.dev/rank?player=TenZ%23NA1&region=na`
 
-> Note: `#` **must** be URL-encoded as `%23` (e.g., `russz%231982`).
+> Note: `#` **must** be URL-encoded as `%23` (e.g., `TenZ%23NA1`).
 
 ---
 
@@ -28,6 +30,7 @@ Examples:
 Create a **Custom Command** called `!rank`.
 
 ### Fixed player (e.g. the streamer’s own account)
+Replace `Name#TAG` with the account you want to track:
 
 ```
 $(urlfetch https://vave-valorant.deno.dev/rank?player=$(urlencode Name#TAG)&region=eu)
@@ -48,20 +51,28 @@ Set a cooldown (5–10s) to avoid spam. 👌
 ## API
 
 ### `GET /rank`
-
 **Query params**
-
 - `player` (required) — format: `Name#TAG` (remember to URL-encode `#` as `%23`)
 - `region` (optional) — one of `eu`, `na`, `ap`, `kr`, `latam`, `br` (default `eu`)
 
 **Response**
-
 - Plain text line: `Rank: <Tier> | RR: <points> | Elo: <elo>`
-- If upstream/format issues occur: `Rank is temporarily unavailable.`
+- If both sources fail or return empty values: `Rank is temporarily unavailable.`
 
 **Debug**
-
 - `GET /__debug` → `{"hasKey":true,"ttl":"60000"}` (does not leak the actual key)
+
+---
+
+## How It Works
+
+1. **HenrikDev (primary)** — we call `Authorization: <HENRIK_API_KEY>` (⚠️ **no `Bearer` prefix**).  
+2. **KyrosKoh (fallback)** — if Henrik fails or returns incomplete data, we call  
+   `https://api.kyroskoh.xyz/valorant/v1/mmr/<region>/<name>/<tag>?show=all&display=0`  
+   and parse the returned text to extract Rank / RR / Elo.  
+   If parsing fails, the raw line from Kyros is returned as-is.
+
+Caching is in-memory (per instance) and controlled by `CACHE_TTL_MS` (default 60s).
 
 ---
 
@@ -73,19 +84,18 @@ Set a cooldown (5–10s) to avoid spam. 👌
 2) **Root directory:** `deno`  
    **Entrypoint:** `deno/main.ts`  
 3) **Environment Variables:**  
-   - `HENRIK_API_KEY` — your HenrikDev API key (**no `Bearer`**, just the raw key)  
+   - `HENRIK_API_KEY` — your HenrikDev API key (**no `Bearer`**, just the raw key) — optional if you rely only on the Kyros fallback  
    - `CACHE_TTL_MS` — optional, default `60000` (60s)
 4) Deploy, then test:
    - `/` → `OK`  
    - `/__debug` → `{"hasKey":true,...}`  
-   - `/rank?player=russz%231982&region=na`
+   - `/rank?player=TenZ%23NA1&region=na`
 
-> Uses an in-memory cache per instance. Ideal for chat usage and keeps Henrik API calls low.
+> Uses an in-memory cache per instance. Ideal for chat usage and keeps upstream calls low.
 
 ### Option B — Node/Express (local or any VPS)
 
 1) Install & run:
-   
    ```bash
    npm i
    npm start
