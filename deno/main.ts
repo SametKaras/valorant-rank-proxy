@@ -14,13 +14,13 @@ function formatLine(d: { rank?: string | null; rr?: number | null; elo?: number 
   return parts.join(" | ");
 }
 
-// basit RAM cache (Deno Deploy instance resetlerinde sıfırlanır; bizim kullanım için yeterli)
+// basit RAM cache (Deno Deploy instance resetlerinde sıfırlanır)
 const CACHE = new Map<string, { data: { rank?: string|null; rr?: number|null; elo?: number|null }; until: number }>();
 
+/** Henrik JSON'undan rank/RR/Elo çıkar */
 function parseHenrik(json: any) {
   const d = json?.data;
   if (!d) return null;
-
   const cd = d.current_data ?? d;
 
   let rank =
@@ -51,6 +51,37 @@ function parseHenrik(json: any) {
         break;
       }
     }
+  }
+  if (rank == null && rr == null && elo == null) return null;
+  return { rank, rr, elo };
+}
+
+/** KyrosKoh text çıktısını Rank/RR/Elo'ya çevirmeyi dener; olmazsa null döner */
+function parseKyrosText(text: string): { rank?: string|null; rr?: number|null; elo?: number|null } | null {
+  const t = (text || "").trim();
+  if (!t) return null;
+
+  // Elo: "... 2045 Elo"
+  const eloMatch = t.match(/(\d+)\s*Elo/i);
+  const elo = eloMatch ? Number(eloMatch[1]) : null;
+
+  // RR: "... 71RR" veya "... 71 RR"
+  const rrMatch = t.match(/(\d+)\s*RR/i);
+  const rr = rrMatch ? Number(rrMatch[1]) : null;
+
+  // Rank: ilk ':' veya ',' öncesi, yoksa RR/Elo parçalarını temizleyip kalan
+  let rank: string | null = null;
+  if (t.includes(":")) {
+    rank = t.split(":")[0].trim();
+  } else if (t.includes(",")) {
+    rank = t.split(",")[0].trim();
+  } else {
+    let r = t.replace(/(\d+)\s*RR/gi, "")
+             .replace(/(\d+)\s*Elo/gi, "")
+             .replace(/[.|,]/g, "")
+             .trim();
+    // sayısal kırpma sonrası çok kısa değilse rank sayalım
+    if (r && r.length >= 3) rank = r;
   }
 
   if (rank == null && rr == null && elo == null) return null;
@@ -91,50 +122,67 @@ Deno.serve(async (req) => {
       return new Response(formatLine(hit.data), { status: 200 });
     }
 
-    // upstream (HenrikDev)
+    // 1) Henrik (primary)
     const apiKey = Deno.env.get("HENRIK_API_KEY");
-    if (!apiKey) {
-      return new Response("Server misconfigured (missing HENRIK_API_KEY).", { status: 500 });
-    }
+    if (apiKey) {
+      try {
+        const api = `https://api.henrikdev.xyz/valorant/v2/mmr/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`;
+        const res = await fetch(api, {
+          headers: {
+            // DİKKAT: Bearer kullanma — anahtar direkt Authorization değeridir
+            "Authorization": apiKey,
+            "Accept": "application/json",
+            "User-Agent": "valorant-rank-proxy/deno"
+          }
+        });
 
-    const api = `https://api.henrikdev.xyz/valorant/v2/mmr/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`;
-    let res: Response;
-    try {
-      res = await fetch(api, {
-        headers: {
-          // DİKKAT: Bearer kullanma — anahtar direkt Authorization değeridir
-          "Authorization": apiKey,
-          "Accept": "application/json",
-          "User-Agent": "valorant-rank-proxy/deno"
+        const raw = await res.text();
+        console.log("Henrik status:", res.status);
+        console.log("Henrik body:", raw.slice(0, 200));
+
+        if (res.ok) {
+          let json: any = null;
+          try { json = JSON.parse(raw); } catch { json = null; }
+          const data = json ? parseHenrik(json) : null;
+          if (data) {
+            CACHE.set(key, { data, until: Date.now() + ttl });
+            return new Response(formatLine(data), { status: 200 });
+          }
         }
+      } catch (e) {
+        console.warn("Henrik fetch error:", String(e));
+      }
+    }
+
+    // 2) KyrosKoh (fallback, text response) — show=all tüm bilgileri içerir, display=0 sade satır verir
+    try {
+      const kyros = `https://api.kyroskoh.xyz/valorant/v1/mmr/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}?show=all&display=0`;
+      const kres = await fetch(kyros, {
+        headers: { "User-Agent": "valorant-rank-proxy/deno" }
       });
-    } catch {
-      // network hatası: varsa son iyi değeri döndür
-      if (hit) return new Response(formatLine(hit.data), { status: 200 });
-      return new Response("Rank is temporarily unavailable.", { status: 503 });
+      const kraw = await kres.text();
+      console.log("Kyros status:", kres.status);
+      console.log("Kyros body:", kraw.slice(0, 200));
+
+      if (kres.ok) {
+        const data = parseKyrosText(kraw);
+        if (data) {
+          CACHE.set(key, { data, until: Date.now() + ttl });
+          return new Response(formatLine(data), { status: 200 });
+        }
+        // parse edemezsek olduğu gibi iletebiliriz (en kötü senaryo)
+        const plain = kraw.trim();
+        if (plain) return new Response(plain, { status: 200 });
+      }
+    } catch (e) {
+      console.warn("Kyros fetch error:", String(e));
     }
 
-    const raw = await res.text();
-    // logları Deno Deploy → Logs'ta görürsün (teşhis için faydalı)
-    console.log("Henrik status:", res.status);
-    console.log("Henrik body:", raw.slice(0, 200));
+    // 3) Upstream'ler başarısız: varsa son iyi değer
+    const fallback = CACHE.get(key);
+    if (fallback) return new Response(formatLine(fallback.data), { status: 200 });
 
-    if (!res.ok) {
-      if (hit) return new Response(formatLine(hit.data), { status: 200 });
-      return new Response("Rank is temporarily unavailable.", { status: 503 });
-    }
-
-    let json: any = null;
-    try { json = JSON.parse(raw); } catch { json = null; }
-    const data = json ? parseHenrik(json) : null;
-
-    if (!data) {
-      if (hit) return new Response(formatLine(hit.data), { status: 200 });
-      return new Response("Rank is temporarily unavailable.", { status: 503 });
-    }
-
-    CACHE.set(key, { data, until: Date.now() + ttl });
-    return new Response(formatLine(data), { status: 200 });
+    return new Response("Rank is temporarily unavailable.", { status: 503 });
   }
 
   return new Response("Not found", { status: 404 });
