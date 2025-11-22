@@ -19,7 +19,7 @@ GET https://vave-valorant.deno.dev/rank?player=<Name%23TAG>&region=<eu|na|ap|kr|
 Examples:
 
 - Healthcheck: `https://vave-valorant.deno.dev/` → `OK`
-- Rank: `https://vave-valorant.deno.dev/rank?player=russz%231982&region=na`
+- Rank: `https://vave-valorant.deno.dev/rank?player=russz%231982&region=eu`
 
 > Note: `#` **must** be URL-encoded as `%23` (e.g., `russz%231982`).
 
